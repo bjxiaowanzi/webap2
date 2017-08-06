@@ -7,9 +7,15 @@ __author__ = 'Blues'
 Database operation module
 '''
 
-import threading, logging, time
+import threading, logging, time, uuid, functools
 
 # Helper
+def next_id(t=None):
+	''' primary key's default value '''
+	if t is None:
+		t = time.time()
+	return '%015d%s000' % (int(t * 1000), uuid.uuid4().hex)
+
 class Dict(dict):
 	def __init__(self, names=(), values=(), **kw):
 		super(Dict, self).__init__(**kw)
