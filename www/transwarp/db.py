@@ -223,7 +223,7 @@ def _select(sql, first, *args):
 			if not values:
 				return None
 			return Dict(names, values)
-		return[Dict(names, x)] for x in cursor.fetchall()
+		return [Dict(names, x) for x in cursor.fetchall()]
 	finally:
 		if cursor:
 			cursor.close()
@@ -263,15 +263,15 @@ def _update(sql, *args):
 
 def insert(table, **kw):
 	cols, args = zip(*kw.iteritems())
-	sql = 'insert into `%s` (%s) values (%s)' % (table, ','.join(['`%s`' % col for cols]), ','.join(['?' for i in range(len(cols))]))
+	sql = 'insert into `%s` (%s) values (%s)' % (table, ','.join(['`%s`' % col for col in cols]), ','.join(['?' for i in range(len(cols))]))
 	return _update(sql, *args)
 
 def update(sql, *args):
-	return _update(sql. *args)
+	return _update(sql, *args)
 
 if __name__ == '__main__':
 	logging.basicConfig(level=logging.DEBUG)
-	create_engine('www-data', 'www-data', 'test')
+	create_engine('www-data', 'www-data', 'blog')
 	update('drop table if exists user')
 	update('create table user (id int primary key, name text, passwd text, lastest_modified real)')
 	import doctest

@@ -13,14 +13,14 @@ import db
 
 # Field for db
 class Field(object):
-	count = 0
+	_count = 0
 	def __init__(self, **kw):
 		self.name = kw.get('name', None)
 		self._default = kw.get('default', None)
 		self.primary_key = kw.get('primary_key', False)
 		self.nullable = kw.get('nullable', False)
-		self.updatable = kw.get('updatable', False)
-		self.insertable = kw.get('insertable'. False)
+		self.updatable = kw.get('updatable', True)
+		self.insertable = kw.get('insertable', True)
 		self.ddl = kw.get('ddl', '')
 		self._order = Field._count
 		Field._count = Field._count + 1
@@ -31,10 +31,10 @@ class Field(object):
 		return d() if callable(d) else d
 
 	def __str__(self):
-		s = ['<%s:%s, %s,%s,default(%s),' % (self.__class__.__name__, self.name, self.ddl, self._default)]
+		s = ['<%s:%s,%s,default(%s),' % (self.__class__.__name__, self.name, self.ddl, self._default)]
 		self.nullable and s.append('N')
-		self.updatable and self.append('U')
-		self.insertable and self.append('I')
+		self.updatable and s.append('U')
+		self.insertable and s.append('I')
 		s.append('>')
 		return ''.join(s)
 
@@ -243,7 +243,7 @@ class Model(dict):
 
 if __name__ == '__main__':
 	logging.basicConfig(level=logging.DEBUG)
-	db.create_engin('www-data', 'www-data', 'test')
+	db.create_engin('www-data', 'www-data', 'blog')
 	db.update('drop table if exist user')
 	db.update('create table user (id int primary key, name text, email text, passwd text, last_modified real)')
 	import doctest
