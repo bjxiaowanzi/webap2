@@ -55,10 +55,57 @@ class IntegerField(Field):
 		super(IntegerField, self).__init__(**kw)
 
 class FloatField(Field):
-	def __init__(self, arg):
-		super(FloatField, self).__init__()
-		self.arg = arg
+	def __init__(self, **kw):
+		if not 'default' in kw:
+			kw['default'] = 0.0
+		if not 'ddl' in kw:
+			kw['ddl'] = 'real'
+		super(FloatField, self).__init__(**kw)
+
+class BooleanField(Field):
+	def __init__(self, **kw):
+		if not 'default' in kw:
+			kw['default'] = False
+		if not 'ddl' in kw:
+			kw['ddl'] = 'bool'
+		super(BooleanField, self).__init__(**kw)
+
+class TextField(Field):
+	def __init__(self, **kw):
+		if not 'default' in kw:
+			kw['default'] = ''
+		if not 'ddl' in kw:
+			kw['ddl'] = 'text'
+		super(TextField, self).__init__(**kw)
 		
+class BlobField(Field):
+	def __init__(self, **kw):
+		if not 'default' in kw:
+			kw['default'] = ''
+		if not 'ddl' in kw:
+			kw['ddl'] = 'blob'
+		super(BlobField, self).__init__(**kw)
+
+class VersionField(Field):
+	def __init__(self, name=None):
+		super(VersionField, self).__init__(name=name, default=0, ddl=bigint)
+
+_triggers = frozenset(['pre_insert', 'pre_update', 'pre_delete'])
+
+def _gen_sql(table_name, mappings):
+	pk = None
+	sql = ['-- generating SQL for %s: ' % table_name, 'create table `%s` (' % table_name]
+	for f in sorted(mappings.values(), lambda x, y: cmp(x._order, y._order)):
+		if not hasattr(f, 'ddl'):
+			raise StandardError('no ddl in field "%s".' % n)
+		ddl = f.ddl
+		nullable = f.nullable
+		if f.primary_key:
+			pk = f.name
+		sql.append(nullable and '  `%s` %s,' % (f.name, ddl) or '  `%s` %s not null,' % (f.name, ddl))
+	sql.append('  primary key(`%s`)' % pk)
+	sql.append(');')
+	return '\n'.join(sql)
 		
 class ModelMetaclass(type):
 	def __new__(cls, name, bases, attrs):
