@@ -208,7 +208,7 @@ def unauthorized():
 	return HttpError(401)
 		
 def forbidden():
-	request HttpError(403)
+	return HttpError(403)
 
 def notfound():
 	return HttpError(404)
@@ -256,7 +256,7 @@ def get(path):
 	return _decorator
 
 def post(path):
-	def _decorartor(func):
+	def _decorator(func):
 		func.__web_route__ = path
 		func.__web_method__ = 'POST'
 		return func
@@ -293,7 +293,7 @@ class Route(object):
 	def __init__(self, func):
 		self.path = func.__web_route__
 		self.method = func.__web_method__
-		self.is_static = re_route.search(self.path) is None
+		self.is_static = _re_route.search(self.path) is None
 		if not self.is_static:
 			self.route = re.compile(_build_regex(self.path))
 		self.func = func
@@ -455,10 +455,12 @@ class Request(object):
 				for c in cookie_str.split(';'):
 					pos = c.find('=')
 					if pos > 0:
-						cookies[c[:pos].strip()] = _unquote(c[pos + 1:])
+						cookies[c[:pos].strip()] = _unquote(c[pos+1:])
 			self._cookies = cookies
 		return self._cookies
 
+	# 这里都声明为property了
+	@property
 	def cookies(self):
 		return Dict(**self._get_cookies())
 
@@ -496,7 +498,7 @@ class Response(object):
 		if key in self._headers:
 			del self._headers[key]
 
-	def set_header(self, key, value):
+	def set_header(self, name, value):
 		key = name.upper()
 		if not key in _RESPONSE_HEADER_DICT:
 			key = name
@@ -532,7 +534,7 @@ class Response(object):
 			if isinstance(expires, (float, int, long)):
 				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires, UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
 			if isinstance(expires,(datetime.date, datetime.datetime)):
-				L.append('Expires=%s', % expires.astimezone(UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
+				L.append('Expires=%s' % expires.astimezone(UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
 		elif isinstance(max_age, (int, long)):
 			L.append('Max-Age=%d' % max_age)
 		L.append('Path=%s' % path)
@@ -676,7 +678,7 @@ class WSGIApplication(object):
 		self._running = False
 		self._document_root = document_root
 
-		self._interceptor = []
+		self._interceptors = []
 		self._template_engine = None
 
 		self._get_static = {}
@@ -736,7 +738,7 @@ class WSGIApplication(object):
 		_application = Dict(document_root = self._document_root)
 
 		def fn_route():
-			request_method = ctx,request,request_method
+			request_method = ctx.request.request_method
 			path_info = ctx.request.path_info
 			if request_method == 'GET':
 				fn = self._get_static.get(path_info, None)
@@ -805,7 +807,7 @@ class WSGIApplication(object):
 		from wsgiref.simple_server import make_server
 		logging.info('Application (%s) will start at %s:%s...' % (self._document_root, host, port))
 		server = make_server(host, port, self.get_wsgi_application())
-		server.server_forever()
+		server.serve_forever()
 
 
 # wsgi = WSGIApplication()
