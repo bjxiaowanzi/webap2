@@ -7,7 +7,8 @@ Web framework, include WSGI
 
 __author__ = 'Blues'
 
-import urllib, re, logging, threading. cgi
+
+import urllib, re, logging, threading, datetime, cgi, sys, os, types, time, functools, mimetypes, traceback
 
 # 引用I/O库，优先使用cStringIO，如果失败，则使用StringIO
 try:
@@ -80,9 +81,99 @@ _RESPONSE_STATUSES = {
     507: 'Insufficient Storage',
     510: 'Not Extended',
 }
+
+_RESPONSE_HEADERS = (
+    'Accept-Ranges',
+    'Age',
+    'Allow',
+    'Cache-Control',
+    'Connection',
+    'Content-Encoding',
+    'Content-Language',
+    'Content-Length',
+    'Content-Location',
+    'Content-MD5',
+    'Content-Disposition',
+    'Content-Range',
+    'Content-Type',
+    'Date',
+    'ETag',
+    'Expires',
+    'Last-Modified',
+    'Link',
+    'Location',
+    'P3P',
+    'Pragma',
+    'Proxy-Authenticate',
+    'Refresh',
+    'Retry-After',
+    'Server',
+    'Set-Cookie',
+    'Strict-Transport-Security',
+    'Trailer',
+    'Transfer-Encoding',
+    'Vary',
+    'Via',
+    'Warning',
+    'WWW-Authenticate',
+    'X-Frame-Options',
+    'X-XSS-Protection',
+    'X-Content-Type-Options',
+    'X-Forwarded-Proto',
+    'X-Powered-By',
+    'X-UA-Compatible',
+)
+_RE_RESPONSE_STATUS = re.compile(r'^\d\d\d(\ [\w\ ]+)?$')
+_RESPONSE_HEADER_DICT = dict(zip(map(lambda x: x.upper(), _RESPONSE_HEADERS), _RESPONSE_HEADERS))
 _HEADER_X_POWERED_BY = ('X-Powered-By', 'transwarp/1.0')
 
-# HTTP exception
+# Helper class
+class Dict(dict):
+	def __init__(self, names=(), values=(), **kw):
+		super(Dict, self).__init__(**kw)
+		for k, v in zip(names, values):
+			self[k] = v
+
+	def __getattr__(self, key):
+		try:
+			return self[key]
+		except KeyError:
+			raise AttributeError(r"'Dict' object has no attribute '%s'" % key)
+
+	def __setattr__(self, key, value):
+		self[key] = value
+
+_RE_TZ = re.compile('^([\+\-])([0-9]{1,2})\:([0-9]{1,2})$')
+_TIMEDELTA_ZERO = datetime.timedelta(0)
+class UTC(datetime.tzinfo):
+	def __init__(self, utc):
+		utc = str(utc.strip().upper())
+		mt = _RE_TZ.match(utc)
+		if mt:
+			minus = mt.group(1)==''
+			h = int(mt.group(2))
+			m = int(mt.group(3))
+			if minus:
+				h, m = (-h), (-m)
+			self._utcoffset = datetime.timedelta(hours=h, minutes=m)
+			self._tzname = 'UTC%s' % utc
+		else:
+			raise ValueError('Bad utc time zone')
+
+	def utcoffset(self, dt):
+		return self._utcoffset
+
+	def dst(self, dt):
+		return _TIMEDELTA_ZERO
+
+	def tzname(self, dt):
+		return self._tzname
+
+	def __str__(self):
+		return 'UTC tzinfo object (%s)' % self._tzname
+
+	__repr__ = __str__
+
 class HttpError(Exception):
 	def __init__(self, code):
 		super(HttpError, self).__init__()
@@ -119,7 +210,7 @@ def unauthorized():
 	return HttpError(401)
 		
 def forbidden():
-	request HttpError(403)
+	return HttpError(403)
 
 def notfound():
 	return HttpError(404)
@@ -167,7 +258,7 @@ def get(path):
 	return _decorator
 
 def post(path):
-	def _decorartor(func):
+	def _decorator(func):
 		func.__web_route__ = path
 		func.__web_method__ = 'POST'
 		return func
@@ -205,7 +296,7 @@ class Route(object):
 	def __init__(self, func):
 		self.path = func.__web_route__
 		self.method = func.__web_method__
-		self.is_static = re_route.search(self.path) is None
+		self.is_static = _re_route.search(self.path) is None
 		if not self.is_static:
 			self.route = re.compile(_build_regex(self.path))
 		self.func = func
@@ -318,7 +409,7 @@ class Request(object):
 
 	@property
 	def remote_addr(self):
-		return self._environ.get('REMMOTE_ADDR', '0.0.0.0')
+		return self._environ.get('REMOTE_ADDR', '0.0.0.0')
 
 	@property
 	def document_root(self):
@@ -368,10 +459,12 @@ class Request(object):
 				for c in cookie_str.split(';'):
 					pos = c.find('=')
 					if pos > 0:
-						cookies[c[:pos].strip()] = _unquote(c[pos + 1:])
+						cookies[c[:pos].strip()] = _unquote(c[pos+1:])
 			self._cookies = cookies
 		return self._cookies
 
+	# 这里都声明为property了
+	@property
 	def cookies(self):
 		return Dict(**self._get_cookies())
 
@@ -409,7 +502,7 @@ class Response(object):
 		if key in self._headers:
 			del self._headers[key]
 
-	def set_header(self, key, value):
+	def set_header(self, name, value):
 		key = name.upper()
 		if not key in _RESPONSE_HEADER_DICT:
 			key = name
@@ -430,6 +523,10 @@ class Response(object):
 	def content_length(self):
 		self.set_header('CONTENT-LENGTH', str(value))
 
+	@content_length.setter
+	def content_length(self, value):
+		self.set_header('CONTENT-LENGTH', str(value))
+
 	def delete_cookie(self, name):
 		self.set_cookie(name, '__deleted__', expires=0)
 
@@ -441,7 +538,7 @@ class Response(object):
 			if isinstance(expires, (float, int, long)):
 				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires, UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
 			if isinstance(expires,(datetime.date, datetime.datetime)):
-				L.append('Expires=%s', % expires.astimezone(UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
+				L.append('Expires=%s' % expires.astimezone(UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT'))
 		elif isinstance(max_age, (int, long)):
 			L.append('Max-Age=%d' % max_age)
 		L.append('Path=%s' % path)
@@ -487,18 +584,19 @@ class Response(object):
 		else:
 			raise TypeError('Bad type of response code.')
 
-
-def interceptor(pattern):
-	pass
-
 # HTML templates engine
+class Template(object):
+	def __init__(self, template_name, **kw):
+		self.template_name = template_name
+		self.model = dict(**kw)
+
 class TemplateEngine(object):
 	def __call__(self, path, model):
 		return '<!-- override this method to render template -->'
 
 class Jinja2TemplateEngine(TemplateEngine):
 	def __init__(self, templ_dir, **kw):
-		from jinja import Environment, FileSystemLoader
+		from jinja2 import Environment, FileSystemLoader
 		if not 'autoescape' in kw:
 			kw['autoescape'] = True
 		self._env = Environment(loader=FileSystemLoader(templ_dir), **kw)
@@ -509,6 +607,18 @@ class Jinja2TemplateEngine(TemplateEngine):
 	def __call__(self, path, model):
 		return self._env.get_template(path).render(**model).encode('utf-8')
 
+def _default_error_handler(e, start_response, is_debug):
+	if isinstance(e, HttpError):
+		logging.info('HttpError: %s' % e.status)
+		headers = e.headers[:]
+		headersa.append(('Content-Type', 'text/html'))
+		start_response(e.status, headers)
+		return ('<html><body><h1>%s</h1></body></html>' % e.status)
+	logging.exception('Exception:')
+	start_response('500 Internal Server Error', [('Content-Type', 'text/html'), _HEADER_X_POWERED_BY])
+	if is_debug:
+		return _debug()
+	return ('<html><body><h1>500 Internal Server Error</h1><h3>%s</h3></body></html>' % str(e))
 
 def view(path):
 	def _decorator(func):
@@ -572,7 +682,7 @@ class WSGIApplication(object):
 		self._running = False
 		self._document_root = document_root
 
-		self._interceptor = []
+		self._interceptors = []
 		self._template_engine = None
 
 		self._get_static = {}
@@ -632,7 +742,7 @@ class WSGIApplication(object):
 		_application = Dict(document_root = self._document_root)
 
 		def fn_route():
-			request_method = ctx,request,request_method
+			request_method = ctx.request.request_method
 			path_info = ctx.request.path_info
 			if request_method == 'GET':
 				fn = self._get_static.get(path_info, None)
@@ -701,7 +811,13 @@ class WSGIApplication(object):
 		from wsgiref.simple_server import make_server
 		logging.info('Application (%s) will start at %s:%s...' % (self._document_root, host, port))
 		server = make_server(host, port, self.get_wsgi_application())
-		server.server_forever()
+		server.serve_forever()
+
+# wsgi = WSGIApplication()
+#if __name__ == '__main__':
+#	wsgi()
+#else:
+#	application = wsgi.get_wsgi_application()
 
 if __name__ == '__main__':
 	sys.path.append('.')

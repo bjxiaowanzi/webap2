@@ -9,9 +9,21 @@ from transwarp import db
 
 db.create_engine(user='www-data', password='www-data', database='blog')
 
-u = User(name='Test_Name', email='test@example.com', password='1234567890', image='about:blank')
+u = User(name='Blues', email='blues@example.com', password='1234567890', image='about:blank')
 u.insert()
 print 'new user id:', u.id
+
+blog1 = Blog(name='Blog1', summary='第一篇测试的博文标题', content='第一篇测试的博文，第一篇测试的博文，第一篇测试的博文，第一篇测试的博文，第一篇测试的博文，第一篇测试的博文，第一篇测试的博文！', user_id='00150254165747608e36aae414e40d28bef550952dbd166000', user_name='Test_Name', user_image='about:blank')
+blog1.insert()
+print 'new blog id:', blog1.id
+
+blog2 = Blog(name='Blog2', summary='第二篇测试的博文标题', content='第二篇测试的博文，第二篇测试的博文，第二篇测试的博文，第二篇测试的博文，第二篇测试的博文，第二篇测试的博文，第二篇测试的博文！', user_id='00150254165747608e36aae414e40d28bef550952dbd166000', user_name='Test_Name', user_image='about:blank')
+blog2.insert()
+print 'new blog id:', blog2.id
+
+blog3 = Blog(name='Blog3', summary='第三篇测试的博文标题', content='The third test blog, The third test blog, The third test blog, The third test blog, The third test blog, The third test blog！', user_id='00150254165747608e36aae414e40d28bef550952dbd166000', user_name='Test_Name', user_image='about:blank')
+blog3.insert()
+print 'new blog id:', blog3.id
 
 #u1 = User.find_first('where email=?', 'test@example.com')
 #print 'find user\'s name:', u1.name
