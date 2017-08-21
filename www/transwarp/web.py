@@ -7,12 +7,18 @@ Web framework, include WSGI
 
 __author__ = 'Blues'
 
-import urllib, re, logging, threading
+import urllib, re, logging, threading. cgi
+
+# 引用I/O库，优先使用cStringIO，如果失败，则使用StringIO
+try:
+	from cStringIO import StringIO
+except ImportError:
+	from StringIO import StringIO
 
 # ThreadLocal
 ctx = threading.local()
 
-# HTTP error - HTTP code & description
+# HTTP const define
 _RESPONSE_STATUSES = {
     # Informational
     100: 'Continue',
@@ -76,13 +82,14 @@ _RESPONSE_STATUSES = {
 }
 _HEADER_X_POWERED_BY = ('X-Powered-By', 'transwarp/1.0')
 
+# HTTP exception
 class HttpError(Exception):
 	def __init__(self, code):
 		super(HttpError, self).__init__()
 		self.status = '%d %s' % (code, _RESPONSE_STATUSES[code])
 
 	def header(self, name, value):
-		if not hasattr(self, '_header'):
+		if not hasattr(self, '_headers'):
 			self._headers = [_HEADER_X_POWERED_BY]
 		self._headers.append((name, value))
 
@@ -166,6 +173,7 @@ def post(path):
 		return func
 	return _decorator
 
+# Class Route
 _re_route = re.compile(r'(\:[a-zA-Z_]\w*)')
 
 def _build_regex(path):
@@ -218,6 +226,7 @@ class Route(object):
 
 	__repr__ = __str__
 
+# Class StaticFileRoute
 def _static_file_generator(fpath):
 	BLOCK_SIZE = 8192
 	with open(fpath, 'rb') as f:
@@ -246,7 +255,7 @@ class StaticFileRoute(object):
 		return _static_file_generator(fpath)
 
 def favicon_handler():
-	return _static_file_handler('/favicon.ico')
+	return static_file_handler('/favicon.ico')
 
 class MultipartFile(object):
 	def __init__(self, storage):
@@ -694,9 +703,7 @@ class WSGIApplication(object):
 		server = make_server(host, port, self.get_wsgi_application())
 		server.server_forever()
 
-
-wsgi = WSGIApplication()
 if __name__ == '__main__':
-	wsgi()
-else:
-	application = wsgi.get_wsgi_application()
+	sys.path.append('.')
+	import doctest
+	doctest.testmod()
