@@ -362,6 +362,7 @@ class Request(object):
 
 	def _parse_input(self):
 		def _convert(item):
+			logging.info('=---= inputs: %s' % 'ssss2')
 			if isinstance(item, list):
 				return [_to_unicode(i.value) for i in item]
 			if item.filename:
@@ -369,8 +370,12 @@ class Request(object):
 			return _to_unicode(item.value)
 		fs = cgi.FieldStorage(fp=self._environ['wsgi.input'], environ=self._environ, keep_blank_values=True)
 		inputs = dict()
+		logging.info('=---= inputs: %s' % fs)
+		logging.info('=---= inputs: %s' % self._environ)
 		for key in fs:
+			logging.info('==== key: %s' % key)
 			inputs[key] = _convert(fs[key])
+		logging.info('=-+++-= inputs: %s' % fs)
 		return inputs
 
 	def _get_raw_input(self):
@@ -398,7 +403,9 @@ class Request(object):
 
 	def input(self, **kw):
 		copy = Dict(**kw)
+		logging.info('===input params: %s' % copy)
 		raw = self._get_raw_input()
+		logging.info(' ---- input params: %s' % raw)
 		for k, v in raw.iteritems():
 			copy[k] = v[0] if isinstance(v, list) else v
 		return copy
@@ -753,7 +760,7 @@ class WSGIApplication(object):
 					if args:
 						return fn(*args)
 				raise notfound()
-			if request.request_method == 'POST':
+			if request_method == 'POST':
 				fn = self._post_static.get(path_info, None)
 				if fn:
 					return fn()
